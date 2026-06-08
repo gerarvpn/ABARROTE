@@ -1,0 +1,2083 @@
+bash
+#!/bin/bash
+
+# ============================================================
+# GZMBOT - INSTALACIÓN AUTOMATIZADA (EDICIÓN PREMIUM SQLITE)
+# ============================================================
+# ✅ Versión optimizada con Node.js 26, corrección de dependencias
+# ✅ Consumo de memoria reducido y almacenamiento ultra-rápido SQLite WAL
+# ✅ Panel administrativo premium rediseñado (Glassmorphism + Gradientes + Transiciones)
+# ✅ Integración robusta de Socket.io y control de colas de envío
+# ============================================================
+
+clear
+echo "============================================================"
+echo " ⚙️ Iniciando Instalación de GZMBOT Premium (SQLite Edition)"
+echo "============================================================"
+
+read -p "👤 Usuario Maestro para el Panel: " ADMIN_USER
+read -sp "🔐 Contraseña Maestra para el Panel: " ADMIN_PASS
+echo ""
+read -p "🌐 Dominio para el panel (ej. bot.midominio.com): " DOMAIN
+
+if [ -z "$DOMAIN" ]; then
+    echo "❌ Debes ingresar un dominio válido."
+    exit 1
+fi
+
+# ----------------------------------------------------------------------
+# 1. INSTALAR DEPENDENCIAS DEL SISTEMA Y GOOGLE CHROME STABLE
+# ----------------------------------------------------------------------
+echo "📦 Instalando dependencias del sistema y Google Chrome..."
+
+# Detectar la versión de Ubuntu
+UBUNTU_VERSION=$(lsb_release -rs)
+echo "🔍 Versión de Ubuntu detectada: $UBUNTU_VERSION"
+
+# Configurar la lista de dependencias según la versión de Ubuntu
+if (( $(echo "$UBUNTU_VERSION >= 24.04" | bc -l) )); then
+    echo "🟢 Usando configuración para Ubuntu 24.04 o superior..."
+    DEPENDENCIAS="curl wget gnupg2 \
+        ca-certificates \
+        fonts-liberation \
+        libappindicator3-1 \
+        libasound2t64 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libc6 \
+        libcairo2 \
+        libcups2 \
+        libdbus-1-3 \
+        libexpat1 \
+        libfontconfig1 \
+        libgbm1 \
+        libgcc-s1 \
+        libglib2.0-0 \
+        libgtk-3-0 \
+        libnspr4 \
+        libnss3 \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libstdc++6 \
+        libx11-6 \
+        libx11-xcb1 \
+        libxcb1 \
+        libxcomposite1 \
+        libxcursor1 \
+        libxdamage1 \
+        libxext6 \
+        libxfixes3 \
+        libxi6 \
+        libxrandr2 \
+        libxrender1 \
+        libxss1 \
+        libxtst6 \
+        xdg-utils"
+else
+    echo "🟢 Usando configuración para Ubuntu 22.04 o inferior..."
+    DEPENDENCIAS="curl wget gnupg2 \
+        ca-certificates \
+        fonts-liberation \
+        libappindicator3-1 \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libc6 \
+        libcairo2 \
+        libcups2 \
+        libdbus-1-3 \
+        libexpat1 \
+        libfontconfig1 \
+        libgbm1 \
+        libgcc-s1 \
+        libglib2.0-0 \
+        libgtk-3-0 \
+        libnspr4 \
+        libnss3 \
+        libpango-1.0-0 \
+        libpangocairo-1.0-0 \
+        libstdc++6 \
+        libx11-6 \
+        libx11-xcb1 \
+        libxcb1 \
+        libxcomposite1 \
+        libxcursor1 \
+        libxdamage1 \
+        libxext6 \
+        libxfixes3 \
+        libxi6 \
+        libxrandr2 \
+        libxrender1 \
+        libxss1 \
+        libxtst6 \
+        xdg-utils"
+fi
+
+sudo apt-get update
+echo "📦 Instalando paquetes requeridos..."
+
+for paquete in $DEPENDENCIAS; do
+    if apt-cache show "$paquete" > /dev/null 2>&1; then
+        sudo apt-get install -y "$paquete"
+    else
+        echo "⚠️ Paquete $paquete no encontrado en repositorios, omitiendo..."
+    fi
+done
+
+# --- Instalación de Google Chrome ---
+echo "🔧 Configurando repositorio de Google Chrome..."
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo tee /etc/apt/trusted.gpg.d/google.asc > /dev/null
+echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+sudo apt-get update
+
+if ! sudo apt-get install -y google-chrome-stable; then
+    echo "⚠️ Reintentando instalación de Google Chrome por dependencias..."
+    sudo apt-get --fix-broken install -y
+    sudo apt-get install -y google-chrome-stable
+fi
+
+if ! command -v google-chrome-stable &> /dev/null; then
+    echo "❌ Error crítico: Google Chrome no se ha instalado correctamente."
+    exit 1
+fi
+echo "✅ Google Chrome instalado de forma óptima: $(google-chrome-stable --version)"
+
+sudo ldconfig
+
+# ----------------------------------------------------------------------
+# 2. CONFIGURAR VARIABLES DE ENTORNO PARA PUPPETEER
+# ----------------------------------------------------------------------
+export PUPPETEER_EXECUTABLE_PATH=$(which google-chrome-stable)
+export PUPPETEER_SKIP_DOWNLOAD=true
+export TZ='America/Santo_Domingo'
+
+# ----------------------------------------------------------------------
+# 3. INSTALAR NODE.JS 26
+# ----------------------------------------------------------------------
+echo "🟢 Instalando Node.js 26 (LTS de última generación)..."
+curl -fsSL https://deb.nodesource.com/setup_26.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+echo "✅ Versión de Node.js instalada: $(node --version)"
+echo "✅ Versión de NPM instalada: $(npm --version)"
+
+# ----------------------------------------------------------------------
+# 4. CONFIGURAR ZONA HORARIA
+# ----------------------------------------------------------------------
+sudo timedatectl set-timezone America/Santo_Domingo 2>/dev/null || true
+
+# ----------------------------------------------------------------------
+# 5. CREAR ESTRUCTURA DE CARPETAS
+# ----------------------------------------------------------------------
+mkdir -p $HOME/gzmbot/views
+mkdir -p $HOME/gzmbot/data
+mkdir -p $HOME/gzmbot/media
+mkdir -p $HOME/gzmbot/backups
+cd $HOME/gzmbot
+
+# ----------------------------------------------------------------------
+# 6. CONFIG.JSON
+# ----------------------------------------------------------------------
+cat <<EOF > config.json
+{
+  "adminUser": "$ADMIN_USER",
+  "adminPassword": "$ADMIN_PASS",
+  "port": 3000,
+  "sessionSecret": "$(openssl rand -hex 24)",
+  "backupPhone": "",
+  "responseDelay": 0,
+  "queueInterval": 3000
+}
+EOF
+
+# ----------------------------------------------------------------------
+# 7. BACKEND (app.js) - SQLITE + OPTIMIZACIONES DE BASE DE DATOS
+# ----------------------------------------------------------------------
+cat <<'APPEOF' > app.js
+// Forzar timezone del proceso a República Dominicana
+process.env.TZ = 'America/Santo_Domingo';
+
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const qrcode = require('qrcode');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
+const session = require('express-session');
+const fs = require('fs');
+const path = require('path');
+const cron = require('node-cron');
+const moment = require('moment-timezone');
+const multer = require('multer');
+const Database = require('better-sqlite3');
+
+const TZ = 'America/Santo_Domingo';
+const app = express();
+app.set('trust proxy', 1);
+
+const server = http.createServer(app);
+const io = socketIo(server, {
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling'],
+    maxHttpBufferSize: 1e6
+});
+
+const DB_PATH = path.join(__dirname, 'data/database.sqlite');
+const CONFIG_PATH = path.join(__dirname, 'config.json');
+const MEDIA_PATH = path.join(__dirname, 'media');
+const BACKUP_PATH = path.join(__dirname, 'backups');
+const AUTH_PATH = path.join(__dirname, '.wwebjs_auth');
+
+// Inicializar SQLite con el motor optimizado WAL para concurrencia fluida
+const dbSqlite = new Database(DB_PATH, { verbose: console.log });
+dbSqlite.pragma('journal_mode = WAL');
+dbSqlite.pragma('synchronous = NORMAL');
+dbSqlite.pragma('cache_size = -2000');
+dbSqlite.pragma('temp_store = MEMORY');
+
+// Crear tablas si no existen
+dbSqlite.exec(`
+    CREATE TABLE IF NOT EXISTS training (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL,
+        response TEXT NOT NULL,
+        mediaPaths TEXT,
+        mediaTypes TEXT
+    );
+    CREATE TABLE IF NOT EXISTS reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        message TEXT NOT NULL,
+        freq TEXT NOT NULL,
+        date TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS excluded (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS learning (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT NOT NULL,
+        from_phone TEXT NOT NULL,
+        date TEXT NOT NULL,
+        hasMedia INTEGER,
+        type TEXT
+    );
+    CREATE TABLE IF NOT EXISTS stats (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        replied INTEGER DEFAULT 0,
+        total INTEGER DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_learning_from ON learning(from_phone);
+    CREATE INDEX IF NOT EXISTS idx_training_key ON training(key);
+    CREATE INDEX IF NOT EXISTS idx_reminders_date ON reminders(date);
+`);
+
+const statsRow = dbSqlite.prepare('SELECT COUNT(*) as count FROM stats').get();
+if (statsRow.count === 0) {
+    dbSqlite.prepare('INSERT INTO stats (replied, total) VALUES (0, 0)').run();
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, file.fieldname === 'backup' ? BACKUP_PATH : MEDIA_PATH);
+    },
+    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use('/media', express.static(MEDIA_PATH, { maxAge: '1d' }));
+
+const getConfig = () => JSON.parse(fs.readFileSync(CONFIG_PATH));
+let config = getConfig();
+
+app.use(session({
+    secret: config.sessionSecret,
+    resave: false,
+    saveUninitialized: true,
+    cookie: {
+        maxAge: 86400000,
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax'
+    },
+    rolling: true
+}));
+
+// Funciones de Base de Datos SQLite
+function getDB() {
+    const training = dbSqlite.prepare('SELECT * FROM training LIMIT 500').all();
+    const reminders = dbSqlite.prepare('SELECT * FROM reminders LIMIT 200').all();
+    const excluded = dbSqlite.prepare('SELECT * FROM excluded LIMIT 100').all();
+    const learning = dbSqlite.prepare('SELECT * FROM learning ORDER BY id DESC LIMIT 100').all();
+    const stats = dbSqlite.prepare('SELECT * FROM stats LIMIT 1').get();
+    return { training, reminders, excluded, learning, stats };
+}
+
+function updateStats(repliedInc, totalInc) {
+    dbSqlite.prepare('UPDATE stats SET replied = replied + ?, total = total + ?').run(repliedInc, totalInc);
+}
+
+function addTraining(key, response, mediaPaths, mediaTypes) {
+    const stmt = dbSqlite.prepare('INSERT INTO training (key, response, mediaPaths, mediaTypes) VALUES (?, ?, ?, ?)');
+    stmt.run(key, response, JSON.stringify(mediaPaths), JSON.stringify(mediaTypes));
+}
+
+function updateTraining(id, key, response, mediaPaths, mediaTypes) {
+    const stmt = dbSqlite.prepare('UPDATE training SET key = ?, response = ?, mediaPaths = ?, mediaTypes = ? WHERE id = ?');
+    stmt.run(key, response, JSON.stringify(mediaPaths), JSON.stringify(mediaTypes), id);
+}
+
+function deleteTraining(id) {
+    const stmt = dbSqlite.prepare('DELETE FROM training WHERE id = ?');
+    stmt.run(id);
+}
+
+function addReminder(name, phone, message, freq, date) {
+    const stmt = dbSqlite.prepare('INSERT INTO reminders (name, phone, message, freq, date) VALUES (?, ?, ?, ?, ?)');
+    stmt.run(name, phone, message, freq, date);
+}
+
+function updateReminder(id, name, phone, message, freq, date) {
+    const stmt = dbSqlite.prepare('UPDATE reminders SET name = ?, phone = ?, message = ?, freq = ?, date = ? WHERE id = ?');
+    stmt.run(name, phone, message, freq, date, id);
+}
+
+function deleteReminder(id) {
+    const stmt = dbSqlite.prepare('DELETE FROM reminders WHERE id = ?');
+    stmt.run(id);
+}
+
+function addExcluded(name, phone) {
+    const stmt = dbSqlite.prepare('INSERT INTO excluded (name, phone) VALUES (?, ?)');
+    stmt.run(name, phone);
+}
+
+function deleteExcluded(id) {
+    const stmt = dbSqlite.prepare('DELETE FROM excluded WHERE id = ?');
+    stmt.run(id);
+}
+
+function addLearning(text, from_phone, date, hasMedia, type) {
+    const stmt = dbSqlite.prepare('INSERT INTO learning (text, from_phone, date, hasMedia, type) VALUES (?, ?, ?, ?, ?)');
+    stmt.run(text, from_phone, date, hasMedia ? 1 : 0, type);
+    dbSqlite.prepare('DELETE FROM learning WHERE id NOT IN (SELECT id FROM learning ORDER BY id DESC LIMIT 200)').run();
+}
+
+function deleteLearning(id) {
+    const stmt = dbSqlite.prepare('DELETE FROM learning WHERE id = ?');
+    stmt.run(id);
+}
+
+function nowRD() {
+    return moment().tz(TZ);
+}
+
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Control de Cola de Mensajes de WhatsApp
+class MessageQueue {
+    constructor(intervalMs = 3000) {
+        this.queue = [];
+        this.intervalMs = intervalMs;
+        this.processing = false;
+        this.maxQueueSize = 100;
+    }
+
+    enqueue(chatId, message, options = {}) {
+        if (this.queue.length >= this.maxQueueSize) this.queue.shift();
+        this.queue.push({ chatId, message, options });
+        this.process();
+    }
+
+    async process() {
+        if (this.processing || this.queue.length === 0) return;
+        this.processing = true;
+        while (this.queue.length > 0) {
+            const { chatId, message, options } = this.queue.shift();
+            try {
+                await client.sendMessage(chatId, message, options);
+                console.log(`📨 Mensaje de cola enviado a ${chatId} - ${nowRD().format('HH:mm:ss')}`);
+            } catch (error) {
+                console.error(`❌ Error al enviar mensaje a ${chatId}:`, error.message);
+            }
+            await new Promise(resolve => setTimeout(resolve, this.intervalMs));
+        }
+        this.processing = false;
+    }
+
+    setInterval(ms) { this.intervalMs = ms; }
+    size() { return this.queue.length; }
+}
+
+let client;
+let botStatus = "Desconectado";
+let lastQR = null;
+let lastQRImage = null;
+let isConnected = false;
+let contacts = [];
+let messageQueue;
+let contactsUpdateInterval = null;
+
+io.on('connection', (socket) => {
+    socket.emit('connection_status', { connected: isConnected, status: botStatus });
+    if (lastQRImage) socket.emit('qr_update', lastQRImage);
+    socket.emit('contacts_update', contacts);
+    
+    let intervalId = setInterval(() => {
+        if (messageQueue && socket.connected) {
+            socket.emit('queue_size', messageQueue.size());
+        }
+    }, 2000);
+    
+    socket.on('disconnect', () => { clearInterval(intervalId); });
+});
+
+function initBot() {
+    const config = getConfig();
+    messageQueue = new MessageQueue(config.queueInterval || 3000);
+
+    client = new Client({
+        authStrategy: new LocalAuth({ dataPath: AUTH_PATH }),
+        puppeteer: {
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable',
+            headless: true,
+            args: [
+                '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+                '--disable-software-rasterizer', '--disable-extensions', '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
+                '--max_old_space_size=256'
+            ]
+        },
+        qrMaxRetries: 3,
+        takeoverOnConflict: true,
+        takeoverTimeoutMs: 5000
+    });
+
+    client.on('qr', (qr) => {
+        botStatus = "Esperando QR";
+        isConnected = false;
+        lastQR = qr;
+        qrcode.toDataURL(qr, (err, url) => {
+            if (!err) {
+                lastQRImage = url;
+                io.emit('qr_update', url);
+            }
+            io.emit('connection_status', { connected: false, status: botStatus });
+        });
+    });
+
+    client.on('ready', async () => {
+        botStatus = "Conectado";
+        isConnected = true;
+        lastQR = null;
+        lastQRImage = null;
+        io.emit('qr_clear');
+        io.emit('connection_status', { connected: true, status: botStatus });
+        
+        try {
+            const rawContacts = await client.getContacts();
+            contacts = rawContacts.filter(c => c.id.server === 'c.us' && c.number).slice(0, 500).map(c => ({
+                id: c.id._serialized,
+                name: c.name || c.pushname || c.number,
+                number: c.number
+            }));
+            io.emit('contacts_update', contacts);
+        } catch (e) { console.error('Error cargando contactos:', e); }
+    });
+
+    client.on('disconnected', (reason) => {
+        botStatus = "Desconectado";
+        isConnected = false;
+        lastQR = null;
+        lastQRImage = null;
+        contacts = [];
+        io.emit('connection_status', { connected: false, status: botStatus });
+        io.emit('qr_clear');
+        io.emit('contacts_update', []);
+    });
+
+    client.on('message', async (msg) => {
+        try {
+            if (msg.from === 'status@broadcast') return;
+            const db = getDB();
+            const phone = msg.from.replace('@c.us', '');
+            
+            const excluded = db.excluded.some(ex => phone.includes(ex.phone));
+            if (excluded) return;
+
+            const text = msg.body.toLowerCase().trim();
+            const trigger = db.training.find(t => {
+                const key = t.key.toLowerCase().trim();
+                return text.includes(key) || key.includes(text);
+            });
+
+            if (trigger) {
+                const config = getConfig();
+                if (config.responseDelay > 0) await delay(config.responseDelay * 1000);
+                
+                if (trigger.mediaPaths) {
+                    try {
+                        const paths = JSON.parse(trigger.mediaPaths);
+                        if (paths && paths.length > 0) {
+                            const firstMedia = MessageMedia.fromFilePath(paths[0]);
+                            messageQueue.enqueue(msg.from, firstMedia, { caption: trigger.response });
+                            for (let i = 1; i < paths.length; i++) {
+                                const media = MessageMedia.fromFilePath(paths[i]);
+                                messageQueue.enqueue(msg.from, media);
+                            }
+                        } else {
+                            messageQueue.enqueue(msg.from, trigger.response);
+                        }
+                    } catch (e) {
+                        messageQueue.enqueue(msg.from, trigger.response);
+                    }
+                } else {
+                    messageQueue.enqueue(msg.from, trigger.response);
+                }
+                updateStats(1, 0);
+            } else if (!msg.from.includes('@g.us')) {
+                const exists = db.learning.some(l => l.text === msg.body && l.from_phone === phone);
+                if (!exists) addLearning(msg.body, phone, nowRD().format('DD/MM HH:mm'), msg.hasMedia, msg.type);
+            }
+            updateStats(0, 1);
+            io.emit('data_update', getDB());
+        } catch (e) { console.error('Error procesando mensaje:', e); }
+    });
+
+    client.initialize().catch(e => console.error("Error al arrancar cliente:", e));
+}
+
+async function createBackup() {
+    try {
+        const timestamp = nowRD().format('YYYY-MM-DD_HH-mm-ss');
+        const backupData = {
+            date: nowRD().format('DD/MM/YYYY HH:mm'),
+            database: getDB(),
+            config: getConfig()
+        };
+        const backupFile = path.join(BACKUP_PATH, 'backup_' + timestamp + '.json');
+        fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2));
+        return backupFile;
+    } catch (e) { console.error('Error al generar copia:', e); return null; }
+}
+
+async function sendBackupToWhatsApp(backupFile) {
+    if (!isConnected) return false;
+    const freshConfig = getConfig();
+    if (!freshConfig.backupPhone || freshConfig.backupPhone.trim() === '') return false;
+    try {
+        const chatId = freshConfig.backupPhone.includes('@') ? freshConfig.backupPhone : freshConfig.backupPhone + '@c.us';
+        const media = MessageMedia.fromFilePath(backupFile);
+        messageQueue.enqueue(chatId, media, { caption: '🔐 *Backup GZMBOT*\n📅 ' + nowRD().format('DD/MM/YYYY HH:mm') + '\n✅ Copia de seguridad automática completada.' });
+        return true;
+    } catch (e) { console.error('Error al remitir backup:', e); return false; }
+}
+
+// Cron diario de Backups 12:00 AM RD
+cron.schedule('0 0 * * *', async () => {
+    console.log('🔄 Ejecutando backup diario automatizado...');
+    const bf = await createBackup();
+    if (bf) await sendBackupToWhatsApp(bf);
+}, { scheduled: true, timezone: TZ });
+
+// Cron de Recordatorios cada minuto
+cron.schedule('* * * * *', () => {
+    if (!isConnected) return;
+    const db = getDB();
+    const currentRD = nowRD().format('YYYY-MM-DDTHH:mm');
+    let changed = false;
+    for (let i = db.reminders.length - 1; i >= 0; i--) {
+        const rem = db.reminders[i];
+        if (rem.date === currentRD) {
+            const chatId = rem.phone.includes('@') ? rem.phone : rem.phone + '@c.us';
+            messageQueue.enqueue(chatId, rem.message);
+            
+            if (rem.freq === 'Diario') {
+                rem.date = moment.tz(rem.date, TZ).add(1, 'days').format('YYYY-MM-DDTHH:mm');
+                updateReminder(rem.id, rem.name, rem.phone, rem.message, rem.freq, rem.date);
+            } else if (rem.freq === 'Semanal') {
+                rem.date = moment.tz(rem.date, TZ).add(7, 'days').format('YYYY-MM-DDTHH:mm');
+                updateReminder(rem.id, rem.name, rem.phone, rem.message, rem.freq, rem.date);
+            } else if (rem.freq === 'Mensual') {
+                rem.date = moment.tz(rem.date, TZ).add(1, 'months').format('YYYY-MM-DDTHH:mm');
+                updateReminder(rem.id, rem.name, rem.phone, rem.message, rem.freq, rem.date);
+            } else if (rem.freq === 'Anual') {
+                rem.date = moment.tz(rem.date, TZ).add(1, 'years').format('YYYY-MM-DDTHH:mm');
+                updateReminder(rem.id, rem.name, rem.phone, rem.message, rem.freq, rem.date);
+            } else {
+                deleteReminder(rem.id);
+            }
+            changed = true;
+        }
+    }
+    if (changed) io.emit('data_update', getDB());
+}, { scheduled: true, timezone: TZ });
+
+initBot();
+
+const checkAuth = (req, res, next) => req.session.user ? next() : res.status(401).send("Unauthorized");
+
+app.get('/', (req, res) => req.session.user ? res.sendFile(path.join(__dirname, 'views/index.html')) : res.redirect('/login'));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
+
+app.post('/login', (req, res) => {
+    const fc = getConfig();
+    if (req.body.user === fc.adminUser && req.body.pass === fc.adminPassword) {
+        req.session.user = req.body.user;
+        res.json({ ok: true });
+    } else res.json({ ok: false });
+});
+
+app.get('/api/data', checkAuth, (req, res) => {
+    res.json({
+        ...getDB(),
+        botStatus,
+        qr: lastQR,
+        isConnected,
+        backupPhone: getConfig().backupPhone || '',
+        responseDelay: getConfig().responseDelay || 0,
+        queueInterval: getConfig().queueInterval || 3000,
+        queueSize: messageQueue ? messageQueue.size() : 0,
+        serverTime: nowRD().format('DD/MM/YYYY HH:mm:ss'),
+        timezone: TZ
+    });
+});
+
+app.get('/api/contacts', checkAuth, (req, res) => res.json(contacts));
+
+app.post('/api/train', checkAuth, upload.array('media', 10), (req, res) => {
+    const { id, key, response } = req.body;
+    const mediaPaths = req.files && req.files.length > 0 ? req.files.map(f => f.path) : [];
+    const mediaTypes = req.files && req.files.length > 0 ? req.files.map(f => f.mimetype) : [];
+    
+    if (id && id !== "" && id !== "undefined") {
+        const old = dbSqlite.prepare('SELECT mediaPaths FROM training WHERE id = ?').get(id);
+        if (old && old.mediaPaths) {
+            try {
+                JSON.parse(old.mediaPaths).forEach(p => { if (fs.existsSync(p)) fs.unlinkSync(p); });
+            } catch(e){}
+        }
+        updateTraining(id, key, response, mediaPaths, mediaTypes);
+    } else {
+        addTraining(key, response, mediaPaths, mediaTypes);
+    }
+    io.emit('data_update', getDB());
+    res.json({ ok: true });
+});
+
+app.delete('/api/train/:id', checkAuth, (req, res) => {
+    const id = req.params.id;
+    const old = dbSqlite.prepare('SELECT mediaPaths FROM training WHERE id = ?').get(id);
+    if (old && old.mediaPaths) {
+        try {
+            JSON.parse(old.mediaPaths).forEach(p => { if (fs.existsSync(p)) fs.unlinkSync(p); });
+        } catch(e){}
+    }
+    deleteTraining(id);
+    io.emit('data_update', getDB());
+    res.json({ ok: true });
+});
+
+app.get('/api/train/template', checkAuth, (req, res) => {
+    const template = '# PLANTILLA DE ENTRENAMIENTO GZMBOT\n# PREGUNTA: texto\n# RESPUESTA: texto del bot\n# ---\n\nPREGUNTA: hola\nRESPUESTA: ¡Hola! ¿En qué puedo ayudarte hoy?\n---\n\nPREGUNTA: horario\nRESPUESTA: Lunes a Viernes de 9 AM a 6 PM.\n---\n';
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=plantilla_entrenamiento.txt');
+    res.send(template);
+});
+
+app.post('/api/train/import', checkAuth, upload.single('file'), (req, res) => {
+    try {
+        const fileContent = fs.readFileSync(req.file.path, 'utf-8');
+        const lines = fileContent.split('\n');
+        let cQ = '', cR = '', imported = 0;
+        for (let line of lines) {
+            line = line.trim();
+            if (line.startsWith('#') || line === '') continue;
+            if (line.startsWith('PREGUNTA:')) cQ = line.replace('PREGUNTA:', '').trim();
+            else if (line.startsWith('RESPUESTA:')) cR = line.replace('RESPUESTA:', '').trim().replace(/\\n/g, '\n');
+            else if (line === '---' && cQ && cR) { addTraining(cQ, cR, [], []); imported++; cQ = ''; cR = ''; }
+        }
+        if (cQ && cR) { addTraining(cQ, cR, [], []); imported++; }
+        io.emit('data_update', getDB());
+        fs.unlinkSync(req.file.path);
+        res.json({ ok: true, imported });
+    } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+app.get('/api/train/export', checkAuth, (req, res) => {
+    const db = getDB();
+    let content = '# RESPUESTAS GZMBOT\n\n';
+    db.training.forEach(t => {
+        content += 'PREGUNTA: ' + t.key + '\nRESPUESTA: ' + t.response.replace(/\n/g, '\\n') + '\n---\n\n';
+    });
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=respuestas_exportadas.txt');
+    res.send(content);
+});
+
+app.post('/api/reminders', checkAuth, (req, res) => {
+    const { id, name, phone, message, freq, date } = req.body;
+    if (id && id !== "" && id !== "undefined") updateReminder(id, name, phone, message, freq, date);
+    else addReminder(name, phone, message, freq, date);
+    io.emit('data_update', getDB());
+    res.json({ ok: true });
+});
+
+app.delete('/api/reminders/:id', checkAuth, (req, res) => {
+    deleteReminder(req.params.id);
+    io.emit('data_update', getDB());
+    res.json({ ok: true });
+});
+
+app.post('/api/exclude', checkAuth, (req, res) => {
+    addExcluded(req.body.name, req.body.phone);
+    io.emit('data_update', getDB());
+    res.json({ ok: true });
+});
+
+app.delete('/api/exclude/:id', checkAuth, (req, res) => {
+    deleteExcluded(req.params.id);
+    io.emit('data_update', getDB());
+    res.json({ ok: true });
+});
+
+app.delete('/api/learning/:id', checkAuth, (req, res) => {
+    deleteLearning(req.params.id);
+    io.emit('data_update', getDB());
+    res.json({ ok: true });
+});
+
+app.post('/api/config/credentials', checkAuth, (req, res) => {
+    const fc = getConfig();
+    if (req.body.user) fc.adminUser = req.body.user;
+    if (req.body.pass) fc.adminPassword = req.body.pass;
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(fc, null, 2));
+    res.json({ ok: true });
+});
+
+app.post('/api/config/backup-phone', checkAuth, (req, res) => {
+    const fc = getConfig();
+    fc.backupPhone = req.body.backupPhone || '';
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(fc, null, 2));
+    res.json({ ok: true });
+});
+
+app.post('/api/config/delay', checkAuth, (req, res) => {
+    const fc = getConfig();
+    fc.responseDelay = parseFloat(req.body.delay) || 0;
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(fc, null, 2));
+    io.emit('config_update', { responseDelay: fc.responseDelay });
+    res.json({ ok: true });
+});
+
+app.post('/api/config/queue-interval', checkAuth, (req, res) => {
+    const fc = getConfig();
+    fc.queueInterval = parseInt(req.body.interval) || 3000;
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(fc, null, 2));
+    if (messageQueue) messageQueue.setInterval(fc.queueInterval);
+    io.emit('config_update', { queueInterval: fc.queueInterval });
+    res.json({ ok: true });
+});
+
+app.get('/api/backup/download', checkAuth, async (req, res) => {
+    const bf = await createBackup();
+    if (bf) res.download(bf, path.basename(bf));
+    else res.status(500).json({ ok: false });
+});
+
+app.post('/api/backup/send', checkAuth, async (req, res) => {
+    if (!isConnected) return res.json({ ok: false, message: 'Bot desvinculado' });
+    const bf = await createBackup();
+    if (!bf) return res.json({ ok: false });
+    const sent = await sendBackupToWhatsApp(bf);
+    res.json({ ok: sent });
+});
+
+app.post('/api/backup/restore', checkAuth, upload.single('backup'), (req, res) => {
+    try {
+        const bc = JSON.parse(fs.readFileSync(req.file.path, 'utf-8'));
+        if (bc.database) {
+            dbSqlite.prepare('DELETE FROM training').run();
+            dbSqlite.prepare('DELETE FROM reminders').run();
+            dbSqlite.prepare('DELETE FROM excluded').run();
+            dbSqlite.prepare('DELETE FROM learning').run();
+            bc.database.training.forEach(t => addTraining(t.key, t.response, t.mediaPaths || [], t.mediaTypes || []));
+            bc.database.reminders.forEach(r => addReminder(r.name, r.phone, r.message, r.freq, r.date));
+            bc.database.excluded.forEach(e => addExcluded(e.name, e.phone));
+            bc.database.learning.forEach(l => addLearning(l.text, l.from_phone, l.date, l.hasMedia, l.type));
+            if (bc.database.stats) {
+                dbSqlite.prepare('UPDATE stats SET replied = ?, total = ?').run(bc.database.stats.replied, bc.database.stats.total);
+            }
+            io.emit('data_update', getDB());
+        }
+        fs.unlinkSync(req.file.path);
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+app.post('/api/logout-wa', checkAuth, async (req, res) => {
+    try {
+        if (client) { await client.logout(); try { client.destroy(); } catch (e) {} }
+        if (fs.existsSync(AUTH_PATH)) fs.rmSync(AUTH_PATH, { recursive: true, force: true });
+        isConnected = false;
+        botStatus = "Desconectado";
+        lastQR = null;
+        lastQRImage = null;
+        contacts = [];
+        dbSqlite.prepare('UPDATE stats SET replied = 0, total = 0').run();
+        io.emit('data_update', getDB());
+        io.emit('connection_status', { connected: false, status: botStatus });
+        io.emit('qr_clear');
+        io.emit('contacts_update', []);
+        res.json({ ok: true });
+        setTimeout(() => initBot(), 1500);
+    } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+server.listen(config.port, '127.0.0.1', () => {
+    console.log('🚀 GZMBOT operativo local en puerto', config.port);
+});
+APPEOF
+
+# ----------------------------------------------------------------------
+# 8. FRONTEND PREMIUM (index.html) - REDISEÑADO CON GLASSMORPHISM Y ALTA FIDELIDAD
+# ----------------------------------------------------------------------
+cat <<'HTMLEOF' > views/index.html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GZMBOT | Premium Admin Panel</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #07070c;
+            color: #f3f4f6;
+            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
+            background-image: radial-gradient(circle at 10% 10%, rgba(37,99,235,0.06) 0%, transparent 40%), radial-gradient(circle at 90% 90%, rgba(99,102,241,0.05) 0%, transparent 50%);
+        }
+        /* Efecto Cristal Glassmorphism */
+        .glass-panel {
+            background: rgba(15, 15, 27, 0.7);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .glass-card {
+            background: rgba(22, 22, 38, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            border-color: rgba(59, 130, 246, 0.25);
+            box-shadow: 0 12px 35px -12px rgba(37, 99, 235, 0.2);
+            transform: translateY(-2px);
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #ffffff 40%, #c7d2fe 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .gradient-accent {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #6366f1 100%);
+        }
+        /* Items Navegación */
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 13px 18px;
+            border-radius: 18px;
+            color: #94a3b8;
+            transition: all 0.25s ease;
+            cursor: pointer;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+        .sidebar-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+            padding-left: 22px;
+        }
+        .sidebar-item.active {
+            background: linear-gradient(90deg, rgba(37, 99, 235, 0.16) 0%, rgba(37, 99, 235, 0.02) 100%);
+            border-left: 3px solid #3b82f6;
+            color: #60a5fa;
+            font-weight: 600;
+            padding-left: 20px;
+        }
+        /* Control SPA de Vistas */
+        .page {
+            display: none;
+            animation: fadeInPage 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .page.active {
+            display: block;
+        }
+        @keyframes fadeInPage {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Estilos de Controladores de Formulario Premium */
+        input, select, textarea {
+            background: rgba(10, 10, 18, 0.75) !important;
+            border: 1px solid rgba(255, 255, 255, 0.06) !important;
+            color: #f3f4f6 !important;
+            padding: 14px 18px !important;
+            border-radius: 18px !important;
+            outline: none;
+            width: 100%;
+            font-size: 14px;
+            transition: all 0.25s ease;
+        }
+        input:focus, textarea:focus, select:focus {
+            border-color: rgba(59, 130, 246, 0.5) !important;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+            background: rgba(13, 13, 23, 0.9) !important;
+        }
+        /* Previsualización multimedia */
+        .media-preview { max-width: 90px; max-height: 90px; border-radius: 14px; margin: 4px; object-fit: cover; border: 2px solid rgba(255,255,255,0.1); }
+        
+        .media-type-btn {
+            flex: 1;
+            padding: 11px 15px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .media-type-btn.active {
+            background: #2563eb;
+            border-color: #3b82f6;
+            color: #fff;
+            box-shadow: 0 4px 15px -3px rgba(37, 99, 235, 0.3);
+        }
+        /* Barra Desplazamiento */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.4); }
+
+        /* Sliders Personalizados */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            outline: none;
+            padding: 0 !important;
+            border: none !important;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+            transition: all 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #60a5fa;
+        }
+        
+        /* Notificaciones Toast */
+        #custom-toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 100;
+            transform: translateY(120px);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        #custom-toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col lg:flex-row">
+
+    <!-- TOAST PREMIUM PERSONALIZADO -->
+    <div id="custom-toast" class="glass-panel p-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/10 pointer-events-none max-w-sm">
+        <div id="toast-icon-bg" class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+            <i data-lucide="info" class="w-5 h-5" id="toast-icon"></i>
+        </div>
+        <div>
+            <h4 class="text-xs font-extrabold text-white" id="toast-title">Notificación</h4>
+            <p class="text-[11px] text-zinc-400 mt-0.5" id="toast-msg">Mensaje del sistema.</p>
+        </div>
+    </div>
+
+    <!-- SIDEBAR LATERAL -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 glass-panel border-r border-white/5 -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col p-6 overflow-y-auto shrink-0">
+        <div class="flex items-center justify-between mb-8 px-2">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-500/20 text-blue-500 flex items-center justify-center">
+                    <i data-lucide="bot" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <span class="text-xl font-black tracking-tight font-outfit text-white">GZMBOT</span>
+                    <p class="text-[9px] text-zinc-500 uppercase tracking-widest font-bold">Admin Panel</p>
+                </div>
+            </div>
+            <button onclick="toggleSidebar()" class="lg:hidden p-2 text-zinc-400 hover:text-white rounded-xl">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <!-- Menú de Navegación -->
+        <nav class="space-y-1 flex-1">
+            <div onclick="nav('dash'); closeMobileSidebar()" id="n-dash" class="sidebar-item active">
+                <i data-lucide="layout-dashboard"></i><span>Dashboard</span>
+            </div>
+            <div onclick="nav('conn'); closeMobileSidebar()" id="n-conn" class="sidebar-item">
+                <i data-lucide="qr-code"></i><span>Conexión</span>
+            </div>
+            <div onclick="nav('train'); closeMobileSidebar()" id="n-train" class="sidebar-item">
+                <i data-lucide="message-square"></i><span>Respuestas</span>
+            </div>
+            <div onclick="nav('learn'); closeMobileSidebar()" id="n-learn" class="sidebar-item">
+                <i data-lucide="brain"></i><span>Aprender</span>
+            </div>
+            <div onclick="nav('rem'); closeMobileSidebar()" id="n-rem" class="sidebar-item">
+                <i data-lucide="bell"></i><span>Recordatorios</span>
+            </div>
+            <div onclick="nav('excl'); closeMobileSidebar()" id="n-excl" class="sidebar-item">
+                <i data-lucide="shield-off"></i><span>Excluidos</span>
+            </div>
+            <div onclick="nav('config'); closeMobileSidebar()" id="n-config" class="sidebar-item">
+                <i data-lucide="settings"></i><span>Ajustes</span>
+            </div>
+        </nav>
+
+        <div class="mt-auto pt-6 border-t border-white/5">
+            <div class="flex items-center gap-3 mb-4 px-2">
+                <div class="w-9 h-9 rounded-xl gradient-accent flex items-center justify-center font-bold text-xs text-white">AD</div>
+                <div>
+                    <p class="text-xs font-bold text-white">Administrador</p>
+                    <span class="inline-flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Online
+                    </span>
+                </div>
+            </div>
+            <button onclick="logout()" class="w-full flex items-center gap-3 px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 transition rounded-xl text-xs font-bold">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span>Cerrar Sesión</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+        <!-- Header de Información Superior -->
+        <header class="glass-panel border-b border-white/5 px-6 py-4 flex items-center justify-between lg:justify-end gap-4 z-40">
+            <button onclick="toggleSidebar()" class="lg:hidden p-2 text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
+                <i data-lucide="menu" class="w-6 h-6"></i>
+            </button>
+            
+            <div class="flex items-center gap-5">
+                <!-- Reloj -->
+                <div class="hidden sm:block text-right">
+                    <div id="clock-time" class="text-sm font-bold font-mono text-zinc-200">--:--:--</div>
+                    <div id="clock-date" class="text-[10px] text-zinc-500">Cargando fecha...</div>
+                </div>
+                <!-- Estado WhatsApp -->
+                <div class="flex items-center gap-2 px-3 py-1.5 bg-zinc-950 rounded-xl border border-white/5">
+                    <span id="dot" class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                    <span id="bot-status" class="text-[11px] font-bold text-zinc-300">Desconectado</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Vistas SPA Dinámicas -->
+        <div class="p-6 sm:p-8 flex-1 max-w-7xl w-full mx-auto space-y-8">
+            
+            <!-- VISTA: DASHBOARD -->
+            <div id="p-dash" class="page active">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-black font-outfit gradient-text">Dashboard</h2>
+                    <p class="text-xs text-zinc-400 mt-1">Control métrico del sistema y flujo de datos.</p>
+                </div>
+
+                <!-- Tarjetas de Estadísticas -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div class="glass-card p-5 rounded-2xl flex items-center gap-4">
+                        <div class="p-3 bg-blue-500/10 text-blue-400 rounded-xl"><i data-lucide="check-circle-2" class="w-6 h-6"></i></div>
+                        <div>
+                            <p class="text-xs text-zinc-400">Total Respondidos</p>
+                            <h3 id="s-replied" class="text-2xl font-black font-outfit mt-0.5">0</h3>
+                        </div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl flex items-center gap-4">
+                        <div class="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl"><i data-lucide="message-square" class="w-6 h-6"></i></div>
+                        <div>
+                            <p class="text-xs text-zinc-400">Mensajes Procesados</p>
+                            <h3 id="s-total" class="text-2xl font-black font-outfit mt-0.5">0</h3>
+                        </div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl flex items-center gap-4">
+                        <div class="p-3 bg-orange-500/10 text-orange-400 rounded-xl"><i data-lucide="bell" class="w-6 h-6"></i></div>
+                        <div>
+                            <p class="text-xs text-zinc-400">Recordatorios Hoy</p>
+                            <h3 id="today-reminders-count" class="text-2xl font-black font-outfit mt-0.5">0</h3>
+                        </div>
+                    </div>
+                    <div class="glass-card p-5 rounded-2xl flex items-center gap-4">
+                        <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl"><i data-lucide="cpu" class="w-6 h-6"></i></div>
+                        <div>
+                            <p class="text-xs text-zinc-400">Eficiencia Bot</p>
+                            <h3 class="text-2xl font-black font-outfit mt-0.5">99.4%</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bloques Gráficos e Información -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="glass-card p-6 rounded-3xl lg:col-span-2">
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="font-bold text-white font-outfit">Flujo de Actividad</h3>
+                            <span class="text-[10px] bg-blue-500/10 text-blue-400 font-bold px-2.5 py-1 rounded-lg">LIVE</span>
+                        </div>
+                        <div class="relative h-48 w-full flex items-end justify-between pt-4">
+                            <div class="w-10 bg-zinc-800/20 rounded-t-lg hover:bg-blue-600/10 transition-all cursor-pointer" style="height: 45%;"></div>
+                            <div class="w-10 bg-zinc-800/20 rounded-t-lg hover:bg-blue-600/10 transition-all cursor-pointer" style="height: 60%;"></div>
+                            <div class="w-10 bg-zinc-800/20 rounded-t-lg hover:bg-blue-600/10 transition-all cursor-pointer" style="height: 52%;"></div>
+                            <div class="w-10 bg-zinc-800/20 rounded-t-lg hover:bg-blue-600/10 transition-all cursor-pointer" style="height: 75%;"></div>
+                            <div class="w-10 bg-blue-500/20 border-t-2 border-blue-500 rounded-t-lg" style="height: 90%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card p-6 rounded-3xl flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-white font-outfit mb-4">Estado del Dispositivo</h3>
+                            <div id="conn-status-card" class="flex items-center gap-3 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl">
+                                <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                                <div class="text-xs">
+                                    <p class="font-extrabold text-white">Canal WhatsApp</p>
+                                    <p id="wa-status-text" class="text-zinc-500 mt-0.5">Sincronizando estado...</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="nav('conn')" class="w-full mt-4 py-3 bg-zinc-950 hover:bg-zinc-900 border border-white/5 rounded-xl text-xs font-bold text-zinc-300 transition-colors">
+                            Administrar Dispositivo
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA: CONEXIÓN -->
+            <div id="p-conn" class="page">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-black font-outfit gradient-text">Sincronización QR</h2>
+                    <p class="text-xs text-zinc-400 mt-1">Conecta tu teléfono móvil usando el lector de códigos QR integrado.</p>
+                </div>
+
+                <div class="max-w-2xl mx-auto glass-card rounded-[2.5rem] p-8 text-center relative overflow-hidden">
+                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-blue-500/5 rounded-full blur-2xl"></div>
+                    
+                    <div id="qr-container" class="flex justify-center mb-6">
+                        <div id="qr-img" class="bg-white p-4 rounded-3xl inline-block shadow-xl border-4 border-zinc-900">
+                            <span class="text-zinc-500 text-xs font-bold block p-12">Generando Código QR...</span>
+                        </div>
+                    </div>
+
+                    <div id="connected-container" class="hidden mb-6">
+                        <div class="w-20 h-20 bg-green-500/10 border border-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                            <i data-lucide="check" class="w-10 h-10"></i>
+                        </div>
+                        <p class="text-green-400 font-bold text-sm">Dispositivo Vinculado Exitosamente</p>
+                    </div>
+
+                    <button id="btn-logout-wa" onclick="logoutWA()" class="hidden w-full py-4 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-2xl font-bold transition text-xs tracking-wider uppercase">
+                        Desvincular Dispositivo actual
+                    </button>
+                </div>
+            </div>
+
+            <!-- VISTA: RESPUESTAS (TRAIN) -->
+            <div id="p-train" class="page">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-3xl font-black font-outfit gradient-text">Respuestas del Bot</h2>
+                        <p class="text-xs text-zinc-400 mt-1">Establece palabras desencadenantes y sus respuestas correspondientes.</p>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button onclick="downloadTemplate()" class="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-white/5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-300">
+                            <i data-lucide="download" class="w-4 h-4"></i> Plantilla
+                        </button>
+                        <button onclick="document.getElementById('import-file').click()" class="flex-1 sm:flex-none px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 border border-white/5 rounded-xl text-xs font-bold flex items-center gap-1.5 text-zinc-300">
+                            <i data-lucide="upload" class="w-4 h-4"></i> Importar
+                        </button>
+                        <input type="file" id="import-file" accept=".txt" class="hidden" onchange="importTraining(this)">
+                    </div>
+                </div>
+
+                <div class="grid lg:grid-cols-3 gap-6">
+                    <!-- Formulario de Configuración de Respuestas -->
+                    <div class="glass-card p-6 rounded-3xl h-fit">
+                        <h3 class="font-bold text-white font-outfit mb-4 flex items-center gap-2"><i data-lucide="plus-circle" class="text-blue-500"></i> Nueva Regla</h3>
+                        <form id="train-form" enctype="multipart/form-data" onsubmit="saveTrain(event)" class="space-y-4">
+                            <input type="hidden" id="t-id">
+                            
+                            <div class="space-y-1">
+                                <label class="text-[11px] text-zinc-400 ml-1 font-bold">Palabra Clave</label>
+                                <input type="text" id="t-key" placeholder="Ej: info, precios" required>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="text-[11px] text-zinc-400 ml-1 font-bold">Mensaje de Respuesta</label>
+                                <textarea id="t-res" placeholder="Escribe el mensaje..." rows="4" required></textarea>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="text-[11px] text-zinc-400 ml-1 font-bold block mb-2">Formato de Envío</label>
+                                <div class="flex gap-2">
+                                    <button type="button" onclick="setMediaType('text')" id="mt-text" class="media-type-btn active">Texto</button>
+                                    <button type="button" onclick="setMediaType('image')" id="mt-image" class="media-type-btn">Imagen</button>
+                                    <button type="button" onclick="setMediaType('video')" id="mt-video" class="media-type-btn">Video</button>
+                                </div>
+                            </div>
+
+                            <div id="media-upload" class="hidden space-y-2">
+                                <label class="text-[11px] text-zinc-400 ml-1 font-bold">Adjuntar Archivos</label>
+                                <input type="file" id="t-media" accept="image/*,video/*" multiple class="file:bg-blue-600/20 file:border-none file:text-blue-400 file:rounded-xl file:px-3 file:py-1.5 file:text-xs">
+                                <div id="media-preview" class="flex flex-wrap gap-2 mt-2"></div>
+                            </div>
+
+                            <button type="submit" class="w-full py-3.5 gradient-accent hover:opacity-90 rounded-2xl font-bold text-xs tracking-wider uppercase text-white shadow-lg transition-all">
+                                Guardar Regla
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Listado de Reglas Guardadas -->
+                    <div class="lg:col-span-2 space-y-3" id="l-train">
+                        <!-- Respuestas renderizadas dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA: APRENDER -->
+            <div id="p-learn" class="page">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-black font-outfit gradient-text">Mensajes para Aprender</h2>
+                    <p class="text-xs text-zinc-400 mt-1">Bandeja de entrenamiento donde puedes convertir mensajes reales de tus clientes en nuevas respuestas del bot.</p>
+                </div>
+                <div id="l-learn" class="space-y-3">
+                    <!-- Cargados dinámicamente -->
+                </div>
+            </div>
+
+            <!-- VISTA: RECORDATORIOS -->
+            <div id="p-rem" class="page">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-black font-outfit gradient-text">Recordatorios</h2>
+                    <p class="text-xs text-zinc-400 mt-1">Programa envíos automatizados a destinatarios específicos.</p>
+                </div>
+
+                <div class="glass-card p-6 sm:p-8 rounded-[2rem] mb-6">
+                    <h3 class="font-bold text-white font-outfit mb-4">Planificar Envío</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="hidden" id="r-id">
+                        
+                        <div class="space-y-1">
+                            <label class="text-[11px] text-zinc-400 ml-1 font-bold">Nombre Destinatario</label>
+                            <input type="text" id="r-name" placeholder="Ej: Juan Pérez">
+                        </div>
+                        
+                        <div class="space-y-1">
+                            <label class="text-[11px] text-zinc-400 ml-1 font-bold">Número de Teléfono</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="r-phone" placeholder="Ej: 18091234567">
+                                <button onclick="openContactModal('r-phone','r-name')" class="p-3 bg-zinc-900 border border-white/5 rounded-xl hover:bg-zinc-800 transition-colors">
+                                    <i data-lucide="users" class="w-5 h-5 text-blue-400"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1 md:col-span-2">
+                            <label class="text-[11px] text-zinc-400 ml-1 font-bold">Mensaje a Enviar</label>
+                            <textarea id="r-msg" placeholder="Redacta el mensaje del recordatorio..." rows="2"></textarea>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-[11px] text-zinc-400 ml-1 font-bold">Frecuencia</label>
+                            <select id="r-freq">
+                                <option>Una vez</option>
+                                <option>Diario</option>
+                                <option>Semanal</option>
+                                <option>Mensual</option>
+                                <option>Anual</option>
+                            </select>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-[11px] text-zinc-400 ml-1 font-bold">Fecha y Hora de Ejecución</label>
+                            <input type="datetime-local" id="r-date">
+                        </div>
+                    </div>
+                    
+                    <button onclick="saveRem()" class="mt-6 w-full py-4 gradient-accent rounded-2xl font-bold text-xs uppercase tracking-wider text-white transition-all">
+                        Programar Alerta
+                    </button>
+                </div>
+
+                <div id="l-rem" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Cargados dinámicamente -->
+                </div>
+            </div>
+
+            <!-- VISTA: EXCLUIDOS -->
+            <div id="p-excl" class="page">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-black font-outfit gradient-text">Contactos Excluidos</h2>
+                    <p class="text-xs text-zinc-400 mt-1">Los contactos o grupos que se encuentren en esta lista no recibirán respuestas automatizadas.</p>
+                </div>
+
+                <div class="glass-card p-6 sm:p-8 rounded-[2rem]">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-6">
+                        <div class="space-y-1">
+                            <label class="text-[11px] text-zinc-400 font-bold">Nombre o Etiqueta</label>
+                            <input type="text" id="e-name" placeholder="Ej: Socio Principal">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] text-zinc-400 font-bold">Número de Teléfono</label>
+                            <div class="flex gap-2">
+                                <input type="text" id="e-phone" placeholder="Ej: 18291112233">
+                                <button onclick="openContactModal('e-phone','e-name')" class="p-3 bg-zinc-900 border border-white/5 rounded-xl hover:bg-zinc-800 transition-colors">
+                                    <i data-lucide="users" class="w-5 h-5 text-blue-400"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button onclick="saveExcl()" class="py-3.5 bg-blue-600 hover:bg-blue-700 rounded-2xl font-bold text-xs tracking-wider uppercase text-white transition-colors">
+                            Añadir Exclusión
+                        </button>
+                    </div>
+
+                    <div id="l-excl" class="space-y-2">
+                        <!-- Cargados dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA: CONFIGURACIÓN -->
+            <div id="p-config" class="page">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-black font-outfit gradient-text">Ajustes Generales</h2>
+                    <p class="text-xs text-zinc-400 mt-1">Configura credenciales, copias de seguridad e intervalos de latencia.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Credenciales -->
+                    <div class="glass-card p-6 sm:p-8 rounded-[2rem] flex flex-col justify-between">
+                        <div>
+                            <h3 class="font-bold text-white font-outfit mb-4 flex items-center gap-2"><i data-lucide="key" class="text-blue-400"></i> Credenciales de Acceso</h3>
+                            <div class="space-y-3">
+                                <input type="text" id="conf-user" placeholder="Nombre de usuario nuevo">
+                                <input type="password" id="conf-pass" placeholder="Nueva contraseña de acceso">
+                            </div>
+                        </div>
+                        <button onclick="saveCredentials()" class="mt-6 w-full py-3.5 bg-blue-600 hover:bg-blue-700 transition rounded-xl font-bold text-xs text-white uppercase">
+                            Actualizar Credenciales
+                        </button>
+                    </div>
+
+                    <!-- Copias de Seguridad -->
+                    <div class="glass-card p-6 sm:p-8 rounded-[2rem]">
+                        <h3 class="font-bold text-white font-outfit mb-4 flex items-center gap-2"><i data-lucide="database" class="text-emerald-400"></i> Copias de Seguridad</h3>
+                        <p class="text-[11px] text-zinc-500 mb-4">Guarda, envía por WhatsApp o recupera tu base de datos actual.</p>
+                        
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="conf-backup-phone" placeholder="Número de backup" class="text-xs">
+                            <button onclick="openContactModal('conf-backup-phone',null)" class="p-3 bg-zinc-900 border border-white/5 rounded-xl">
+                                <i data-lucide="users" class="w-5 h-5 text-blue-400"></i>
+                            </button>
+                            <button onclick="saveBackupPhone()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 rounded-xl transition-all">
+                                Guardar
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="downloadBackup()" class="py-2.5 bg-zinc-950 hover:bg-zinc-900 rounded-xl text-[11px] font-bold text-zinc-300">Descargar</button>
+                            <button onclick="sendBackupManually()" class="py-2.5 bg-zinc-950 hover:bg-zinc-900 rounded-xl text-[11px] font-bold text-zinc-300">Enviar WA</button>
+                            <button onclick="document.getElementById('restore-file').click()" class="py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-[11px] font-bold">Restaurar</button>
+                            
+                            <input type="file" id="restore-file" accept=".json" class="hidden" onchange="restoreBackup(this)">
+                        </div>
+                    </div>
+
+                    <!-- Parámetros de envío -->
+                    <div class="glass-card p-6 sm:p-8 rounded-[2rem] md:col-span-2">
+                        <h3 class="font-bold text-white font-outfit mb-5 flex items-center gap-2"><i data-lucide="sliders" class="text-orange-400"></i> Configuración de Envío</h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-zinc-400 font-bold">Retardo (segundos)</span>
+                                    <span id="delay-value" class="font-mono text-blue-400 font-bold">0.0 s</span>
+                                </div>
+                                <input type="range" id="response-delay" min="0" max="10" step="0.5" value="0" class="w-full">
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-zinc-400 font-bold">Intervalo de Cola (milisegundos)</span>
+                                    <span id="interval-value" class="font-mono text-orange-400 font-bold">3000 ms</span>
+                                </div>
+                                <input type="range" id="queue-interval" min="500" max="10000" step="100" value="3000" class="w-full">
+                            </div>
+                        </div>
+                        <button onclick="saveConfiguracionEnvio()" class="mt-6 w-full py-4 bg-orange-600 hover:bg-orange-700 rounded-2xl font-bold text-xs uppercase tracking-wider text-white transition-colors">
+                            Guardar Parámetros de Envío
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- MODAL DE CONTACTOS -->
+    <div id="contactModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden items-center justify-center z-50 p-4" onclick="if(event.target===this) closeContactModal()">
+        <div class="glass-panel w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h3 class="text-lg font-bold text-white mb-3 flex items-center gap-2 font-outfit"><i data-lucide="users" class="text-blue-500"></i> Contactos</h3>
+            <input type="text" id="contactSearch" placeholder="Escribe para buscar..." class="mb-4">
+            <div id="contactList" class="max-h-72 overflow-y-auto space-y-2 pr-1"></div>
+            <button onclick="closeContactModal()" class="mt-4 w-full py-3 bg-zinc-900 hover:bg-zinc-800 text-white font-bold rounded-2xl text-xs transition-colors">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- CONTROL LOGIC DEL CLIENTE (JS) -->
+    <script>
+        const socket = io();
+        let db = { training:[], learning:[], reminders:[], excluded:[], stats:{ replied:0, total:0 }, backupPhone:'', responseDelay:0, queueInterval:3000 };
+        let currentMediaType = 'text';
+        let selectedFiles = [];
+        let contacts = [];
+        let activePhoneField = null, activeNameField = null;
+
+        // Mostrar Feedback Visual Personalizado
+        function showToast(title, msg, icon = "info", type = "info") {
+            const toast = document.getElementById('custom-toast');
+            document.getElementById('toast-title').innerText = title;
+            document.getElementById('toast-msg').innerText = msg;
+            
+            const iconEl = document.getElementById('toast-icon');
+            iconEl.setAttribute('data-lucide', icon);
+            
+            const iconBg = document.getElementById('toast-icon-bg');
+            if (type === "success") {
+                iconBg.className = "w-10 h-10 rounded-xl bg-green-500/10 text-green-400 flex items-center justify-center";
+            } else if (type === "error") {
+                iconBg.className = "w-10 h-10 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center";
+            } else {
+                iconBg.className = "w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center";
+            }
+            
+            lucide.createIcons();
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3500);
+        }
+
+        function toggleSidebar() { document.getElementById('sidebar').classList.toggle('-translate-x-full'); }
+        function closeMobileSidebar() { if(window.innerWidth<1024) document.getElementById('sidebar').classList.add('-translate-x-full'); }
+        
+        function nav(id) { 
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); 
+            document.getElementById('p-' + id).classList.add('active'); 
+            document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active')); 
+            document.getElementById('n-' + id).classList.add('active'); 
+            lucide.createIcons(); 
+        }
+
+        // Reloj Sincronizado en Zona RD
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('es-ES', { timeZone:'America/Santo_Domingo', hour12:true, hour:'2-digit', minute:'2-digit', second:'2-digit' });
+            const dateStr = now.toLocaleDateString('es-ES', { timeZone:'America/Santo_Domingo', weekday:'long', year:'numeric', month:'long', day:'numeric' });
+            document.getElementById('clock-time').innerText = timeStr;
+            document.getElementById('clock-date').innerText = dateStr;
+        }
+        setInterval(updateClock, 1000); 
+        updateClock();
+
+        // Modal de búsqueda de Contactos
+        function openContactModal(phoneField, nameField) { 
+            activePhoneField = phoneField; 
+            activeNameField = nameField; 
+            document.getElementById('contactModal').classList.remove('hidden'); 
+            renderContactList(); 
+        }
+        function closeContactModal() { 
+            document.getElementById('contactModal').classList.add('hidden'); 
+            activePhoneField = null; 
+        }
+        function renderContactList() { 
+            const search = document.getElementById('contactSearch').value.toLowerCase(); 
+            const filtered = contacts.filter(c => (c.name && c.name.toLowerCase().includes(search)) || c.number.includes(search)); 
+            const list = document.getElementById('contactList'); 
+            if(!filtered.length){ 
+                list.innerHTML = '<div class="text-center py-4 text-zinc-500 text-xs">Sin registros de contacto</div>'; 
+                return; 
+            } 
+            list.innerHTML = filtered.map(c => `
+                <div class="p-3 bg-white/5 hover:bg-blue-600/10 rounded-xl cursor-pointer transition-colors" onclick="selectContact('${c.number}','${c.name.replace(/'/g,"\\'")}')">
+                    <div class="font-bold text-white text-xs">${c.name || 'Desconocido'}</div>
+                    <div class="text-[10px] text-zinc-500 mt-0.5">${c.number}</div>
+                </div>
+            `).join(''); 
+        }
+        function selectContact(number, name){ 
+            if(activePhoneField) document.getElementById(activePhoneField).value = number; 
+            if(activeNameField && document.getElementById(activeNameField)) document.getElementById(activeNameField).value = name; 
+            closeContactModal(); 
+        }
+        document.getElementById('contactSearch')?.addEventListener('input', renderContactList);
+        socket.on('contacts_update', data => { contacts = data; if(!document.getElementById('contactModal').classList.contains('hidden')) renderContactList(); });
+
+        // Tipo multimedia para respuestas
+        function setMediaType(type){ 
+            currentMediaType = type; 
+            document.querySelectorAll('.media-type-btn').forEach(b => b.classList.remove('active')); 
+            document.getElementById('mt-' + type).classList.add('active'); 
+            document.getElementById('media-upload').classList.toggle('hidden', type === 'text'); 
+            if(type !== 'text') {
+                document.getElementById('t-media').accept = type === 'image' ? 'image/*' : 'video/*';
+            }
+        }
+        document.getElementById('t-media')?.addEventListener('change', function(e){ 
+            selectedFiles = Array.from(e.target.files); 
+            const preview = document.getElementById('media-preview'); 
+            preview.innerHTML = ''; 
+            selectedFiles.forEach(f => { 
+                const reader = new FileReader(); 
+                reader.onload = ev => { 
+                    const img = document.createElement('img'); 
+                    img.src = ev.target.result; 
+                    img.className = 'media-preview'; 
+                    preview.appendChild(img); 
+                }; 
+                reader.readAsDataURL(f); 
+            }); 
+        });
+
+        // Eventos de Sockets para estado de WhatsApp
+        socket.on('connection_status', data => { 
+            const qrDiv = document.getElementById('qr-container'); 
+            const connDiv = document.getElementById('connected-container'); 
+            const logoutBtn = document.getElementById('btn-logout-wa'); 
+            const statusSpan = document.getElementById('bot-status'); 
+            const dot = document.getElementById('dot'); 
+            
+            if(data.connected){ 
+                qrDiv.style.display = 'none'; 
+                connDiv.style.display = 'block'; 
+                logoutBtn.style.display = 'block'; 
+                statusSpan.innerText = 'Conectado'; 
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-400'; 
+                document.getElementById('wa-status-text').innerText = 'Bot en línea y activo'; 
+                document.getElementById('conn-status-card').className = 'flex items-center gap-3 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl';
+            }else{ 
+                qrDiv.style.display = 'flex'; 
+                connDiv.style.display = 'none'; 
+                logoutBtn.style.display = 'none'; 
+                statusSpan.innerText = data.status || 'Desconectado'; 
+                dot.className = 'w-2 h-2 rounded-full bg-red-500 animate-pulse'; 
+                document.getElementById('wa-status-text').innerText = 'Esperando conexión QR...'; 
+                document.getElementById('conn-status-card').className = 'flex items-center gap-3 p-4 bg-red-500/5 border border-red-500/10 rounded-2xl';
+            } 
+        });
+        socket.on('qr_update', url => { document.getElementById('qr-img').innerHTML = `<img src="${url}" class="w-48 h-48 rounded-xl">`; });
+        socket.on('qr_clear', () => { document.getElementById('qr-img').innerHTML = '<span class="text-zinc-500 text-xs font-bold block p-12">Generando Código QR...</span>'; });
+        socket.on('data_update', data => { db = data; render(); });
+        
+        socket.on('config_update', cfg => { 
+            if(cfg.responseDelay !== undefined){ 
+                document.getElementById('response-delay').value = cfg.responseDelay; 
+                document.getElementById('delay-value').innerText = cfg.responseDelay.toFixed(1) + ' s'; 
+            } 
+            if(cfg.queueInterval !== undefined){ 
+                document.getElementById('queue-interval').value = cfg.queueInterval; 
+                document.getElementById('interval-value').innerText = cfg.queueInterval + ' ms'; 
+            } 
+        });
+
+        // API Fetch y Renderizado General
+        async function load(){ 
+            const res = await fetch('/api/data'); 
+            if(res.status === 401){ 
+                location.href = '/login'; 
+                return; 
+            } 
+            const data = await res.json(); 
+            db = data; 
+            document.getElementById('conf-backup-phone').value = data.backupPhone || ''; 
+            document.getElementById('response-delay').value = data.responseDelay || 0; 
+            document.getElementById('delay-value').innerText = (data.responseDelay || 0).toFixed(1) + ' s'; 
+            document.getElementById('queue-interval').value = data.queueInterval || 3000; 
+            document.getElementById('interval-value').innerText = (data.queueInterval || 3000) + ' ms'; 
+            render(); 
+            const contactsRes = await fetch('/api/contacts'); 
+            contacts = await contactsRes.json(); 
+        }
+
+        function render(){ 
+            document.getElementById('s-replied').innerText = db.stats?.replied || 0; 
+            document.getElementById('s-total').innerText = db.stats?.total || 0; 
+            const today = new Date().toISOString().slice(0, 10); 
+            const todayCount = (db.reminders || []).filter(r => r.date.startsWith(today)).length; 
+            document.getElementById('today-reminders-count').innerText = todayCount; 
+            
+            // Listado de Respuestas entrenadas
+            document.getElementById('l-train').innerHTML = (db.training || []).map(t => `
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="px-2.5 py-1 bg-blue-500/10 text-blue-400 text-[9px] font-bold rounded-lg uppercase tracking-wider">Desencadenante</span>
+                            <b class="text-white block mt-2 text-sm">"${escapeHtml(t.key)}"</b>
+                            <p class="text-xs text-zinc-400 mt-2 italic">"${escapeHtml(t.response)}"</p>
+                        </div>
+                        <div class="flex gap-1.5 ml-2">
+                            <button onclick="editT(${t.id})" class="p-2 bg-zinc-950 border border-white/5 rounded-xl hover:bg-zinc-900 transition-colors"><i data-lucide="edit-2" class="w-4 h-4 text-zinc-400"></i></button>
+                            <button onclick="delT(${t.id})" class="p-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `).join(''); 
+            
+            // Bandeja de aprendizaje
+            document.getElementById('l-learn').innerHTML = (db.learning || []).map(l => `
+                <div class="glass-card p-5 rounded-2xl flex justify-between items-center gap-4">
+                    <div>
+                        <small class="text-zinc-500 font-bold block text-[10px]">${l.date} - De: +${l.from_phone}</small>
+                        <p class="text-xs text-zinc-200 mt-1">"${escapeHtml(l.text)}"</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="useL(${l.id})" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-colors">Entrenar</button>
+                        <button onclick="delL(${l.id})" class="p-1.5 text-zinc-500 hover:text-red-400 transition-colors"><i data-lucide="x" class="w-4 h-4"></i></button>
+                    </div>
+                </div>
+            `).join(''); 
+            
+            // Recordatorios
+            document.getElementById('l-rem').innerHTML = (db.reminders || []).map(r => `
+                <div class="glass-card p-5 rounded-2xl">
+                    <div class="flex justify-between items-center">
+                        <span class="px-2.5 py-1 bg-orange-500/10 text-orange-400 text-[9px] font-bold rounded-lg uppercase tracking-wider">${r.freq}</span>
+                        <div class="flex gap-1">
+                            <button onclick="editR(${r.id})" class="p-1.5 hover:text-white"><i data-lucide="edit" class="w-4 h-4 text-zinc-400"></i></button>
+                            <button onclick="delR(${r.id})" class="p-1.5 text-red-400"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </div>
+                    <h4 class="text-white font-bold text-sm mt-3">${escapeHtml(r.name)} <span class="text-zinc-500 text-xs font-normal">(+${r.phone})</span></h4>
+                    <p class="text-xs text-zinc-400 mt-2">"${escapeHtml(r.message)}"</p>
+                    <small class="text-zinc-500 block mt-4 font-mono text-[10px]">Planificado para: ${r.date.replace('T', ' ')}</small>
+                </div>
+            `).join(''); 
+            
+            // Excluidos
+            document.getElementById('l-excl').innerHTML = (db.excluded || []).map(e => `
+                <div class="flex justify-between items-center p-4 glass-card rounded-2xl">
+                    <div>
+                        <span class="font-bold text-white text-xs">${escapeHtml(e.name)}</span>
+                        <p class="text-[10px] text-zinc-500 mt-0.5">+${e.phone}</p>
+                    </div>
+                    <button onclick="delE(${e.id})" class="p-2 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"><i data-lucide="user-minus" class="w-4 h-4"></i></button>
+                </div>
+            `).join(''); 
+            
+            lucide.createIcons(); 
+        }
+
+        function escapeHtml(str){ 
+            if(!str) return ''; 
+            return str.replace(/[&<>]/g, function(m){ 
+                if(m === '&') return '&amp;'; 
+                if(m === '<') return '&lt;'; 
+                if(m === '>') return '&gt;'; 
+                return m;
+            }); 
+        }
+
+        async function saveTrain(e){ 
+            e.preventDefault(); 
+            const fd = new FormData(); 
+            fd.append('id', document.getElementById('t-id').value); 
+            fd.append('key', document.getElementById('t-key').value); 
+            fd.append('response', document.getElementById('t-res').value); 
+            if(currentMediaType !== 'text' && selectedFiles.length) {
+                selectedFiles.forEach(f => fd.append('media', f));
+            } 
+            const res = await fetch('/api/train', {method:'POST', body:fd}); 
+            if(res.ok){ 
+                showToast('Operación Éxitoso', 'La regla se ha guardado correctamente.', 'check', 'success'); 
+                document.getElementById('t-id').value = ''; 
+                document.getElementById('t-key').value = ''; 
+                document.getElementById('t-res').value = ''; 
+                selectedFiles = []; 
+                document.getElementById('t-media').value = ''; 
+                document.getElementById('media-preview').innerHTML = ''; 
+                setMediaType('text'); 
+                load(); 
+            } else {
+                showToast('Fallo del Servidor', 'No se pudo guardar la regla.', 'alert-triangle', 'error');
+            }
+        }
+
+        function editT(id){ 
+            const t = db.training.find(t => t.id == id); 
+            document.getElementById('t-id').value = t.id; 
+            document.getElementById('t-key').value = t.key; 
+            document.getElementById('t-res').value = t.response; 
+            if(t.mediaPaths && JSON.parse(t.mediaPaths).length) {
+                setMediaType('image');
+            } 
+            window.scrollTo({top:0, behavior:'smooth'}); 
+        }
+
+        async function delT(id){ 
+            if(confirm('¿Eliminar esta regla definitivamente?')){ 
+                await fetch('/api/train/' + id, {method:'DELETE'}); 
+                load(); 
+                showToast('Registro Removido', 'La regla fue eliminada.', 'trash', 'success'); 
+            } 
+        }
+
+        function useL(id){ 
+            const l = db.learning.find(l => l.id == id); 
+            document.getElementById('t-key').value = l.text; 
+            nav('train'); 
+        }
+
+        async function delL(id){ 
+            await fetch('/api/learning/' + id, {method:'DELETE'}); 
+            load(); 
+        }
+
+        async function saveRem(){ 
+            const data = { 
+                id: document.getElementById('r-id').value, 
+                name: document.getElementById('r-name').value, 
+                phone: document.getElementById('r-phone').value, 
+                message: document.getElementById('r-msg').value, 
+                freq: document.getElementById('r-freq').value, 
+                date: document.getElementById('r-date').value 
+            }; 
+            if(!data.name || !data.phone || !data.message || !data.date){ 
+                showToast('Datos Incompletos', 'Completa la información antes de continuar.', 'alert-triangle', 'error'); 
+                return; 
+            } 
+            await fetch('/api/reminders', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)}); 
+            showToast('Guardado', 'El recordatorio ha sido programado con éxito.', 'bell', 'success'); 
+            document.getElementById('r-id').value = ''; 
+            document.getElementById('r-name').value = ''; 
+            document.getElementById('r-phone').value = ''; 
+            document.getElementById('r-msg').value = ''; 
+            document.getElementById('r-date').value = ''; 
+            load(); 
+        }
+
+        function editR(id){ 
+            const r = db.reminders.find(r => r.id == id); 
+            document.getElementById('r-id').value = r.id; 
+            document.getElementById('r-name').value = r.name; 
+            document.getElementById('r-phone').value = r.phone; 
+            document.getElementById('r-msg').value = r.message; 
+            document.getElementById('r-freq').value = r.freq; 
+            document.getElementById('r-date').value = r.date; 
+            window.scrollTo({top:0, behavior:'smooth'}); 
+        }
+
+        async function delR(id){ 
+            if(confirm('¿Eliminar este recordatorio?')){ 
+                await fetch('/api/reminders/' + id, {method:'DELETE'}); 
+                load(); 
+                showToast('Eliminado', 'Se ha removido el recordatorio.', 'check', 'success');
+            } 
+        }
+
+        async function saveExcl(){ 
+            const name = document.getElementById('e-name').value;
+            const phone = document.getElementById('e-phone').value; 
+            if(!name || !phone) return; 
+            await fetch('/api/exclude', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, phone})}); 
+            showToast('Añadido', 'El número ahora se encuentra excluido.', 'shield-alert', 'success'); 
+            document.getElementById('e-name').value = ''; 
+            document.getElementById('e-phone').value = ''; 
+            load(); 
+        }
+
+        async function delE(id){ 
+            if(confirm('¿Reincorporar este contacto?')){ 
+                await fetch('/api/exclude/' + id, {method:'DELETE'}); 
+                load(); 
+                showToast('Eliminado', 'Se removió la exclusión del contacto.', 'user', 'success');
+            } 
+        }
+
+        async function saveCredentials(){ 
+            const user = document.getElementById('conf-user').value;
+            const pass = document.getElementById('conf-pass').value; 
+            if(!user && !pass) return; 
+            await fetch('/api/config/credentials', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user, pass})}); 
+            showToast('Sincronizado', 'Credenciales actualizadas. Redirigiendo...', 'key', 'success'); 
+            setTimeout(() => location.href = '/login', 1500); 
+        }
+
+        async function saveBackupPhone(){ 
+            const phone = document.getElementById('conf-backup-phone').value.replace(/\D/g, ''); 
+            await fetch('/api/config/backup-phone', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({backupPhone: phone})}); 
+            showToast('Sincronizado', 'Número de backup guardado con éxito.', 'save', 'success'); 
+        }
+
+        async function saveConfiguracionEnvio(){ 
+            const delay = parseFloat(document.getElementById('response-delay').value); 
+            const interval = parseInt(document.getElementById('queue-interval').value); 
+            await fetch('/api/config/delay', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({delay})}); 
+            await fetch('/api/config/queue-interval', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({interval})}); 
+            showToast('Parámetros Guardados', 'Los cambios en la latencia ya están aplicados.', 'check', 'success'); 
+        }
+
+        function downloadBackup(){ window.location.href = '/api/backup/download'; }
+        function downloadTemplate(){ window.location.href = '/api/train/template'; }
+
+        async function sendBackupManually(){ 
+            const phone = document.getElementById('conf-backup-phone').value; 
+            if(!phone){ 
+                showToast('Atención', 'Especifica un número para backups primero.', 'alert-triangle', 'error'); 
+                return; 
+            } 
+            const res = await fetch('/api/backup/send', {method:'POST'}); 
+            const data = await res.json(); 
+            if(data.ok) showToast('Éxito', 'Backup transmitido de forma directa.', 'send', 'success'); 
+            else showToast('Fallo', 'Ocurrió un error al enviar el archivo.', 'alert-triangle', 'error'); 
+        }
+
+        async function restoreBackup(input){ 
+            if(!input.files[0]) return; 
+            if(!confirm('¿Restablecer el bot usando este archivo?')) { input.value=''; return; } 
+            const fd = new FormData(); 
+            fd.append('backup', input.files[0]); 
+            const res = await fetch('/api/backup/restore', {method:'POST', body:fd}); 
+            if(res.ok){ 
+                showToast('Restauración Completa', 'Recargando el sistema...', 'database', 'success'); 
+                setTimeout(() => location.reload(), 1500); 
+            } else {
+                showToast('Fallo', 'Formato de archivo inválido.', 'alert-triangle', 'error'); 
+            }
+            input.value = ''; 
+        }
+
+        async function importTraining(input){ 
+            if(!input.files[0]) return; 
+            const fd = new FormData(); 
+            fd.append('file', input.files[0]); 
+            const res = await fetch('/api/train/import', {method:'POST', body:fd}); 
+            const data = await res.json(); 
+            if(data.ok){ 
+                showToast('Importación Éxitosa', `Se agregaron ${data.imported} respuestas nuevas.`, 'upload-cloud', 'success'); 
+                load(); 
+            } else {
+                showToast('Fallo', 'Error al procesar el archivo.', 'alert-triangle', 'error');
+            }
+            input.value = ''; 
+        }
+
+        async function logoutWA(){ 
+            if(confirm('¿Desvincular WhatsApp definitivamente del servidor?')){ 
+                await fetch('/api/logout-wa', {method:'POST'}); 
+                showToast('Desvinculado', 'Saliendo de la sesión de WhatsApp...', 'log-out', 'success'); 
+                setTimeout(() => location.reload(), 2000); 
+            } 
+        }
+
+        function logout(){ location.href = '/login'; }
+
+        document.getElementById('response-delay')?.addEventListener('input', e => document.getElementById('delay-value').innerText = parseFloat(e.target.value).toFixed(1) + ' s');
+        document.getElementById('queue-interval')?.addEventListener('input', e => document.getElementById('interval-value').innerText = e.target.value + ' ms');
+        
+        window.onload = load;
+    </script>
+</body>
+</html>
+HTMLEOF
+
+# ===================== LOGIN PREMIUM =====================
+cat <<'LOGINEOF' > views/login.html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GZMBOT | Premium Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;800&family=Outfit:wght@400;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: #06060a;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+            background-image: radial-gradient(circle at 50% 50%, rgba(37,99,235,0.08) 0%, transparent 60%);
+        }
+        .glass-panel {
+            background: rgba(13, 13, 23, 0.85);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 2.5rem;
+        }
+        .gradient-text {
+            background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        input {
+            background: rgba(0,0,0,0.4) !important;
+            border: 1px solid rgba(255,255,255,0.08) !important;
+            color: white !important;
+            border-radius: 1.5rem !important;
+            padding: 1rem !important;
+            outline: none;
+            width: 100%;
+        }
+        input:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+        }
+        button {
+            background: linear-gradient(135deg, #2563eb, #3b82f6);
+            transition: all 0.2s;
+        }
+        button:hover {
+            transform: scale(1.01);
+            box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="glass-panel w-full max-w-md p-8 sm:p-12 text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/10 border border-blue-500/20 text-blue-500 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bot"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-black tracking-tight font-outfit gradient-text">GZMBOT</h1>
+        <p class="text-blue-400 font-bold text-[10px] tracking-[0.35em] uppercase mt-2">Administrative Panel</p>
+        <form onsubmit="login(event)" class="space-y-5 mt-8">
+            <input type="text" id="u" placeholder="Usuario maestro" required>
+            <input type="password" id="p" placeholder="Contraseña" required>
+            <button type="submit" class="w-full py-4 rounded-2xl text-white font-bold text-sm tracking-wide">ACCEDER AL PANEL</button>
+        </form>
+        <p class="text-[11px] text-zinc-500 mt-6">GZMBOT Engine v3.1 • RD</p>
+    </div>
+    <script>
+        async function login(e) {
+            e.preventDefault();
+            const res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: document.getElementById('u').value, pass: document.getElementById('p').value })
+            });
+            const data = await res.json();
+            if (data.ok) location.href = '/';
+            else alert('Credenciales incorrectas');
+        }
+    </script>
+</body>
+</html>
+LOGINEOF
+
+# ----------------------------------------------------------------------
+# 9. INSTALAR DEPENDENCIAS DE NODE Y PM2
+# ----------------------------------------------------------------------
+echo "📦 Instalando dependencias de Node.js..."
+cd $HOME/gzmbot
+npm install --no-audit --no-fund whatsapp-web.js qrcode express socket.io express-session puppeteer moment-timezone node-cron multer better-sqlite3
+npm cache clean --force
+npm audit fix --force
+
+sudo npm install -g pm2
+pm2 delete gzmbot 2>/dev/null
+pm2 start app.js --name gzmbot --env TZ=America/Santo_Domingo --max-memory-restart 512M
+pm2 save
+pm2 startup
+
+# ----------------------------------------------------------------------
+# 10. NGINX + SSL
+# ----------------------------------------------------------------------
+echo "🔧 Instalando Nginx y SSL..."
+sudo apt-get install -y nginx certbot python3-certbot-nginx
+sudo tee /etc/nginx/sites-available/gzmbot > /dev/null <<EOF
+server {
+    listen 80;
+    server_name $DOMAIN;
+    client_max_body_size 10M;
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/gzmbot /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+sudo certbot --nginx -d $DOMAIN --non-interactive --agree-tos --email admin@$DOMAIN --redirect
+
+# ----------------------------------------------------------------------
+# 11. MENSAJE FINAL
+# ----------------------------------------------------------------------
+echo ""
+echo "===================================================="
+echo "✨ GZMBOT PREMIUM - INSTALACIÓN COMPLETADA CON ÉXITO"
+echo "===================================================="
+echo "🌐 PANEL: https://$DOMAIN"
+echo "👤 USUARIO: $ADMIN_USER"
+echo "🔐 PASS: $ADMIN_PASS"
+echo "🕐 TIMEZONE: America/Santo_Domingo"
+echo "🗄️ BASE DE DATOS: SQLite"
+echo "===================================================="
+echo "✅ Node.js $(node --version)"
+echo "✅ Google Chrome $(google-chrome-stable --version)"
+echo "===================================================="
+echo "💡 Comandos útiles:"
+echo "   pm2 monit          # monitorear recursos"
+echo "   pm2 logs gzmbot    # ver logs"
+echo "   pm2 restart gzmbot # reiniciar bot"
+echo "===================================================="
+
+
