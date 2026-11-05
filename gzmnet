@@ -1,27 +1,4 @@
 #!/bin/bash
-# ============================================================
-# GZMNET VPN PANEL - v0.0.1
-# - Perf: menos polling, caches más largas, iconos más ligeros
-# - UX: un solo botón cerrar (X); más espacio inferior en modales (barra del navegador)
-# - Fix: cliente conectado aparecía tarde (polling 3s + invalidación total de cachés)
-# - Fix: servidor en puerto 80 caía cada 4s (Nginx fallback ya NO usa puerto 80)
-# - Fix: subida baja (removido mark:255, mejoras de sockopt, mux deshabilitado)
-# - Fix: mux de Trojan en servidor aún estaba activo → ahora deshabilitado
-# - Fix: cálculo de próxima fecha de pago (backend + frontend) más robusto
-# - Fix: generación de claves Reality (parser multi-versión Xray + mejor feedback)
-# - UX: modales de crear servidor/cliente más organizados y modernos
-# - UX: un solo scrollbar en modales + botones Crear/Cerrar arriba + dominio auto
-# - UX: scroll modal completo (última opción visible) + botones modernos
-# - UX: panel más compacto + formularios crear servidor/usuario simplificados
-# - UX: instalador y menú gzm con banner GZMNET
-# - UX: recursos CPU/RAM con más espacio y cards separadas de info del servidor
-# - Fix: bloqueo de anuncios y YouTube mucho más efectivo (+ bloqueo HTTP/3/QUIC)
-# - UX: toggle YouTube en verde (como el resto)
-# - UX: iconos en todos los filtros + Fake DNS
-# - UX: gauges CPU/RAM modernos + cards de servidores mejoradas
-# - Stab: health-check de Xray cada 90s con logs
-# - ZeroSSL únicamente (ECC + RSA) con verificación estricta
-# ============================================================
 
 clear
 # Colores ANSI (azul moderno)
